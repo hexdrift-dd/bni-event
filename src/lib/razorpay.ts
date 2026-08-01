@@ -34,7 +34,8 @@ export async function createUpiPaymentLink(params: {
   region: string;
   memberCount: number;
 }): Promise<CreatedPaymentLink> {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  //const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://bni-event-lime.vercel.app";
 
   const link = await getClient().paymentLink.create({
     upi_link: true,
