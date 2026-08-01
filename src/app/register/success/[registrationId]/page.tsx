@@ -3,7 +3,7 @@ import Link from "next/link";
 import {
   getRegistrationByCode,
   ensurePaymentLink,
-  refreshPaymentLinkStatus,
+  confirmPaymentFromCallback,
 } from "@/lib/registrations";
 import {
   CONTACTS,
@@ -28,25 +28,40 @@ export default async function RegistrationSuccessPage({
   searchParams,
 }: {
   params: Promise<{ registrationId: string }>;
-  searchParams: Promise<{ razorpay_payment_id?: string }>;
+  searchParams: Promise<{
+    razorpay_payment_id?: string;
+    razorpay_payment_link_id?: string;
+    razorpay_payment_link_reference_id?: string;
+    razorpay_payment_link_status?: string;
+    razorpay_signature?: string;
+  }>;
 }) {
   const { registrationId } = await params;
-  const { razorpay_payment_id } = await searchParams;
+  const callback = await searchParams;
+  const returningFromPayment = Boolean(callback.razorpay_payment_id);
   let registration = await getRegistrationByCode(registrationId);
 
   if (!registration) {
     notFound();
   }
 
-  if (razorpay_payment_id && registration.payment_status !== "approved") {
+  if (returningFromPayment && registration.payment_status !== "approved") {
     try {
-      registration = await refreshPaymentLinkStatus(registrationId);
+      registration = await confirmPaymentFromCallback({
+        registrationId,
+        razorpayPaymentId: callback.razorpay_payment_id!,
+        razorpayPaymentLinkId: callback.razorpay_payment_link_id,
+        razorpayPaymentLinkReferenceId:
+          callback.razorpay_payment_link_reference_id,
+        razorpayPaymentLinkStatus: callback.razorpay_payment_link_status,
+        razorpaySignature: callback.razorpay_signature,
+      });
     } catch {
-      // Webhook or manual refresh will still reconcile status
+      // Manual refresh and webhook remain available as fallback
     }
   }
 
-  if (registration.payment_status !== "approved") {
+  if (registration.payment_status !== "approved" && !returningFromPayment) {
     registration = await ensurePaymentLink(registration);
   }
 
@@ -68,14 +83,15 @@ export default async function RegistrationSuccessPage({
       <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
         <div className="mb-8 rounded-2xl border border-[#E2D3B8] bg-gradient-to-br from-[#FFF3E0] to-[#F8EBD7] p-6 sm:p-8">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#A67C52]">
-            Registration confirmed
+            {isApproved ? "Payment complete" : "Registration confirmed"}
           </p>
           <h1 className="mt-2 font-serif text-3xl text-[#CF2030] sm:text-4xl">
             Thank you, {registration.name}
           </h1>
           <p className="mt-2 text-[#6B5344]">
-            Your seat request for {EVENT_CONFIG.name} is recorded. Complete
-            payment below to confirm your seat.
+            {isApproved
+              ? `Your payment for ${EVENT_CONFIG.name} is confirmed. See you at the event!`
+              : `Your seat request for ${EVENT_CONFIG.name} is recorded. Complete payment below to confirm your seat.`}
           </p>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <span className="rounded-lg bg-[#CF2030] px-3 py-2 font-mono text-sm text-[#F8F1E7]">
@@ -125,9 +141,27 @@ export default async function RegistrationSuccessPage({
                 </p>
 
                 {isApproved ? (
-                  <p className="mt-4 rounded-lg bg-emerald-50 px-4 py-3 text-center text-sm font-medium text-emerald-700">
-                    Payment confirmed. Your registration is approved.
-                  </p>
+                  <div className="mt-4 w-full max-w-xs space-y-3">
+                    <p className="rounded-lg bg-emerald-50 px-4 py-3 text-center text-sm font-medium text-emerald-700">
+                      Payment confirmed. Your registration is approved.
+                    </p>
+                    {registration.payment_reference && (
+                      <div className="rounded-lg border border-emerald-200 bg-white px-4 py-3 text-left text-sm">
+                        <p className="text-[#8B7355]">Payment reference</p>
+                        <p className="mt-1 break-all font-mono text-xs text-[#CF2030]">
+                          {registration.payment_reference}
+                        </p>
+                      </div>
+                    )}
+                    {registration.razorpay_payment_link_id && (
+                      <div className="rounded-lg border border-[#E2D3B8] bg-white px-4 py-3 text-left text-sm">
+                        <p className="text-[#8B7355]">Payment link ID</p>
+                        <p className="mt-1 break-all font-mono text-xs text-[#CF2030]">
+                          {registration.razorpay_payment_link_id}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 ) : registration.razorpay_payment_link_url ? (
                   <>
                     <a

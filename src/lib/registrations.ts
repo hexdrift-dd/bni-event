@@ -17,6 +17,8 @@ import {
   createUpiPaymentLink,
   fetchPaymentLink,
   formatRazorpayError,
+  extractPaymentIdFromPaymentLink,
+  verifyPaymentLinkCallbackSignature,
 } from "@/lib/razorpay";
 
 let indexesReady: Promise<void> | null = null;
@@ -305,7 +307,7 @@ export async function refreshPaymentLinkStatus(
     link.status === "paid" &&
     link.amount_paid === Math.round(existing.amount * 100)
   ) {
-    const paymentId = link.payments?.payment_id;
+    const paymentId = extractPaymentIdFromPaymentLink(link);
     if (!paymentId) {
       throw new Error("Payment link is paid but no payment id was returned");
     }
@@ -333,6 +335,81 @@ export async function refreshPaymentLinkStatus(
   }
 
   return existing;
+}
+
+export async function confirmPaymentFromCallback(params: {
+  registrationId: string;
+  razorpayPaymentId: string;
+  razorpayPaymentLinkId?: string;
+  razorpayPaymentLinkReferenceId?: string;
+  razorpayPaymentLinkStatus?: string;
+  razorpaySignature?: string;
+}): Promise<Registration> {
+  await ready();
+  let registration = await getRegistrationByCode(params.registrationId);
+  if (!registration) {
+    throw new Error("Registration not found");
+  }
+  if (registration.payment_status === "approved") {
+    return registration;
+  }
+
+  const paymentLinkId =
+    params.razorpayPaymentLinkId ?? registration.razorpay_payment_link_id;
+
+  if (params.razorpaySignature && paymentLinkId) {
+    const valid = verifyPaymentLinkCallbackSignature({
+      paymentId: params.razorpayPaymentId,
+      paymentLinkId,
+      paymentLinkReferenceId:
+        params.razorpayPaymentLinkReferenceId ?? params.registrationId,
+      paymentLinkStatus: params.razorpayPaymentLinkStatus ?? "paid",
+      signature: params.razorpaySignature,
+    });
+    if (!valid) {
+      throw new Error("Invalid Razorpay callback signature");
+    }
+
+    if (
+      registration.razorpay_payment_link_id &&
+      paymentLinkId !== registration.razorpay_payment_link_id
+    ) {
+      throw new Error("Payment link id mismatch for registration");
+    }
+
+    const updated = await applyPaymentConfirmed({
+      registrationId: params.registrationId,
+      razorpayPaymentId: params.razorpayPaymentId,
+      razorpayPaymentLinkId: paymentLinkId,
+    });
+    if (!updated) {
+      throw new Error("Registration not found");
+    }
+    return updated;
+  }
+
+  registration = await refreshPaymentLinkStatus(params.registrationId);
+  if (registration.payment_status === "approved") {
+    return registration;
+  }
+
+  if (registration.razorpay_payment_link_id) {
+    const link = await fetchPaymentLink(registration.razorpay_payment_link_id);
+    const verifiedPaymentId = extractPaymentIdFromPaymentLink(link);
+    if (
+      link.status === "paid" &&
+      verifiedPaymentId === params.razorpayPaymentId
+    ) {
+      const updated = await applyPaymentConfirmed({
+        registrationId: params.registrationId,
+        razorpayPaymentId: params.razorpayPaymentId,
+        razorpayPaymentLinkId: registration.razorpay_payment_link_id,
+      });
+      if (updated) return updated;
+    }
+  }
+
+  return registration;
 }
 
 export async function getRegistrationByCode(

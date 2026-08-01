@@ -1,4 +1,5 @@
 import Razorpay from "razorpay";
+import { validatePaymentVerification } from "razorpay/dist/utils/razorpay-utils";
 import { EVENT_CONFIG } from "./constants";
 
 let client: Razorpay | null = null;
@@ -78,6 +79,75 @@ export function verifyRazorpayWebhookSignature(
   const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
   if (!secret || !signature) return false;
   return Razorpay.validateWebhookSignature(rawBody, signature, secret);
+}
+
+export function verifyPaymentLinkCallbackSignature(params: {
+  paymentId: string;
+  paymentLinkId: string;
+  paymentLinkReferenceId: string;
+  paymentLinkStatus: string;
+  signature: string;
+}): boolean {
+  const secret = process.env.RAZORPAY_KEY_SECRET;
+  if (!secret || !params.signature) return false;
+
+  try {
+    return validatePaymentVerification(
+      {
+        payment_id: params.paymentId,
+        payment_link_id: params.paymentLinkId,
+        payment_link_reference_id: params.paymentLinkReferenceId,
+        payment_link_status: params.paymentLinkStatus,
+      },
+      params.signature,
+      secret
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Razorpay returns payment link payments as an array at runtime, even though
+ * the SDK types describe a single object.
+ */
+export function extractPaymentIdFromPaymentLink(link: {
+  payments?: unknown;
+}): string | null {
+  const payments = link.payments;
+  if (!payments) return null;
+
+  if (Array.isArray(payments)) {
+    const captured = payments.find(
+      (entry): entry is { payment_id: string; status?: string } =>
+        typeof entry === "object" &&
+        entry !== null &&
+        "payment_id" in entry &&
+        typeof (entry as { payment_id: unknown }).payment_id === "string" &&
+        (entry as { status?: string }).status === "captured"
+    );
+    const chosen = captured ?? payments[0];
+    if (
+      typeof chosen === "object" &&
+      chosen !== null &&
+      "payment_id" in chosen &&
+      typeof (chosen as { payment_id: unknown }).payment_id === "string"
+    ) {
+      return (chosen as { payment_id: string }).payment_id;
+    }
+    return null;
+  }
+
+  if (
+    typeof payments === "object" &&
+    payments !== null &&
+    "payment_id" in payments &&
+    typeof (payments as { payment_id: unknown }).payment_id === "string"
+  ) {
+    return (payments as { payment_id: string }).payment_id;
+  }
+
+  return null;
 }
 
 interface RazorpayApiError {
