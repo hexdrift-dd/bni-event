@@ -17,6 +17,7 @@ import {
   createUpiPaymentLink,
   fetchPaymentLink,
   formatRazorpayError,
+  buildRegistrationSuccessCallbackUrl,
 } from "@/lib/razorpay";
 
 let indexesReady: Promise<void> | null = null;
@@ -153,7 +154,17 @@ export async function ensurePaymentLink(
     registration.razorpay_payment_link_status &&
     usableStatuses.includes(registration.razorpay_payment_link_status)
   ) {
-    return registration;
+    const needsFreshLink =
+      registration.razorpay_payment_link_status !== "paid" &&
+      registration.razorpay_payment_link_id &&
+      !(await paymentLinkCallbackMatches(
+        registration.razorpay_payment_link_id,
+        registration.registration_id
+      ));
+
+    if (!needsFreshLink) {
+      return registration;
+    }
   }
 
   try {
@@ -207,6 +218,19 @@ export async function ensurePaymentLink(
       details: { error: message },
     });
     return registration;
+  }
+}
+
+async function paymentLinkCallbackMatches(
+  paymentLinkId: string,
+  registrationId: string
+): Promise<boolean> {
+  try {
+    const link = await fetchPaymentLink(paymentLinkId);
+    const expected = buildRegistrationSuccessCallbackUrl(registrationId);
+    return link.callback_url === expected;
+  } catch {
+    return false;
   }
 }
 

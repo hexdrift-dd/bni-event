@@ -3,6 +3,38 @@ import { EVENT_CONFIG } from "./constants";
 
 let client: Razorpay | null = null;
 
+function normalizeBaseUrl(url: string): string {
+  return url.trim().replace(/\/+$/, "");
+}
+
+/**
+ * Resolves the public site URL for Razorpay callbacks.
+ * On Vercel, VERCEL_* vars are set automatically even when NEXT_PUBLIC_APP_URL is missing.
+ */
+export function getAppUrl(): string {
+  const explicit = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (explicit) return normalizeBaseUrl(explicit);
+
+  const vercelProduction = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  if (vercelProduction) {
+    return normalizeBaseUrl(`https://${vercelProduction}`);
+  }
+
+  const vercelUrl = process.env.VERCEL_URL?.trim();
+  if (vercelUrl) return normalizeBaseUrl(`https://${vercelUrl}`);
+
+  const nextAuthUrl = process.env.NEXTAUTH_URL?.trim();
+  if (nextAuthUrl) return normalizeBaseUrl(nextAuthUrl);
+
+  return "http://localhost:3000";
+}
+
+export function buildRegistrationSuccessCallbackUrl(
+  registrationId: string
+): string {
+  return `${getAppUrl()}/register/success/${registrationId}`;
+}
+
 function getClient(): Razorpay {
   if (client) return client;
 
@@ -34,8 +66,6 @@ export async function createUpiPaymentLink(params: {
   region: string;
   memberCount: number;
 }): Promise<CreatedPaymentLink> {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-
   const link = await getClient().paymentLink.create({
     upi_link: true,
     amount: Math.round(params.amount * 100),
@@ -59,7 +89,7 @@ export async function createUpiPaymentLink(params: {
       region: params.region,
       member_count: params.memberCount,
     },
-    callback_url: `${appUrl}/register/success/${params.registrationId}`,
+    callback_url: buildRegistrationSuccessCallbackUrl(params.registrationId),
     callback_method: "get",
   });
 
