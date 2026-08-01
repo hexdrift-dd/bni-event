@@ -1,6 +1,10 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getRegistrationByCode, ensurePaymentLink } from "@/lib/registrations";
+import {
+  getRegistrationByCode,
+  ensurePaymentLink,
+  refreshPaymentLinkStatus,
+} from "@/lib/registrations";
 import {
   CONTACTS,
   EVENT_CONFIG,
@@ -21,14 +25,25 @@ import {
 
 export default async function RegistrationSuccessPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ registrationId: string }>;
+  searchParams: Promise<{ razorpay_payment_id?: string }>;
 }) {
   const { registrationId } = await params;
+  const { razorpay_payment_id } = await searchParams;
   let registration = await getRegistrationByCode(registrationId);
 
   if (!registration) {
     notFound();
+  }
+
+  if (razorpay_payment_id && registration.payment_status !== "approved") {
+    try {
+      registration = await refreshPaymentLinkStatus(registrationId);
+    } catch {
+      // Webhook or manual refresh will still reconcile status
+    }
   }
 
   if (registration.payment_status !== "approved") {
@@ -117,15 +132,14 @@ export default async function RegistrationSuccessPage({
                   <>
                     <a
                       href={registration.razorpay_payment_link_url}
-                      target="_blank"
-                      rel="noreferrer"
                       className="mt-4 inline-flex w-full max-w-xs items-center justify-center rounded-xl bg-[#CF2030] px-5 py-3 text-sm font-semibold text-white shadow-md hover:bg-[#A81926]"
                     >
                       Pay now via UPI
                     </a>
                     <p className="mt-2 max-w-xs text-center text-xs text-[#8B7355]">
-                      Opens a secure Razorpay page pre-filled with your amount
-                      — pay with GPay, PhonePe, Paytm, or any UPI app.
+                      You&apos;ll be taken to a secure Razorpay page to pay with
+                      GPay, PhonePe, Paytm, or any UPI app. After payment,
+                      you&apos;ll return here automatically.
                     </p>
                     <PaymentStatusRefresh
                       registrationId={registration.registration_id}
