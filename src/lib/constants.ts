@@ -27,7 +27,7 @@ export const REGIONS = [
 ] as const;
 
 export const PRICING_RULES = {
-  perPerson: 1,
+  perPerson: 1000,
   currency: "INR" as const,
   summaryLines: [
     "₹1 per person",
