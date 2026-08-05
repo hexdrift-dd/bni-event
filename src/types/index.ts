@@ -5,14 +5,19 @@ export type PaymentStatus =
   | "approved"
   | "rejected";
 
+export type MembershipType = "bni_member" | "non_bni_member";
+
 export interface Registration {
   id: string;
   registration_id: string;
   name: string;
   phone: string;
   email: string;
+  membership_type: MembershipType;
   region: string;
   chapter: string;
+  district: string | null;
+  referred_by: string | null;
   category: string;
   member_count: number;
   amount: number;
@@ -34,8 +39,11 @@ export interface RegistrationInsert {
   name: string;
   phone: string;
   email: string;
+  membership_type: MembershipType;
   region: string;
   chapter: string;
+  district?: string | null;
+  referred_by?: string | null;
   category: string;
   member_count: number;
   amount: number;

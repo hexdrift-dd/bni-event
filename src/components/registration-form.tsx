@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { EVENT_CONFIG, PRICING_RULES, REGIONS } from "@/lib/constants";
+import { EVENT_CONFIG, MEMBERSHIP_TYPE_LABELS, MEMBERSHIP_TYPES, PRICING_RULES, REGIONS } from "@/lib/constants";
 import {
   registrationFormSchema,
   type RegistrationFormValues,
@@ -15,6 +15,7 @@ import {
   getPricingRuleLabel,
 } from "@/lib/pricing";
 import { submitRegistrationAction } from "@/app/actions";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,15 +41,34 @@ export function RegistrationForm() {
       phone: "",
       name: "",
       email: "",
+      membershipType: "bni_member",
       region: EVENT_CONFIG.region,
       chapter: "",
+      district: "",
+      referredBy: "",
       memberCount: 1,
       consentAccepted: false,
       notes: "",
     },
   });
 
+  const membershipType = form.watch("membershipType");
   const memberCount = form.watch("memberCount") || 1;
+
+  function handleMembershipTypeChange(
+    nextType: RegistrationFormValues["membershipType"]
+  ) {
+    if (nextType === "bni_member") {
+      form.setValue("district", "");
+      form.setValue("referredBy", "");
+      if (!form.getValues("region")) {
+        form.setValue("region", EVENT_CONFIG.region);
+      }
+    } else {
+      form.setValue("region", "");
+      form.setValue("chapter", "");
+    }
+  }
 
   const summary = useMemo(() => {
     try {
@@ -109,40 +129,103 @@ export function RegistrationForm() {
             </Field>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Email *" error={form.formState.errors.email?.message}>
-              <Input
-                type="email"
-                placeholder="you@example.com"
-                {...form.register("email")}
-              />
-            </Field>
-            <Field
-              label="Region *"
-              error={form.formState.errors.region?.message}
-            >
-              <Select {...form.register("region")}>
-                <option value="" disabled>
-                  Select region
-                </option>
-                {REGIONS.map((region) => (
-                  <option key={region} value={region}>
-                    {region}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-          </div>
-
-          <Field
-            label="Chapter *"
-            error={form.formState.errors.chapter?.message}
-          >
+          <Field label="Email *" error={form.formState.errors.email?.message}>
             <Input
-              placeholder="Enter your chapter name"
-              {...form.register("chapter")}
+              type="email"
+              placeholder="you@example.com"
+              {...form.register("email")}
             />
           </Field>
+
+          <Field
+            label="Membership type *"
+            error={form.formState.errors.membershipType?.message}
+          >
+            <div className="grid gap-3 sm:grid-cols-2">
+              {MEMBERSHIP_TYPES.map((type) => {
+                const selected = membershipType === type;
+                return (
+                  <label
+                    key={type}
+                    className={cn(
+                      "flex cursor-pointer items-center gap-3 rounded-xl border p-4 transition-colors",
+                      selected
+                        ? "border-[#CF2030] bg-[#FFF3E0] ring-2 ring-[#CF2030]/20"
+                        : "border-[#E2D3B8] bg-[#FFFbf5] hover:border-[#C45A12]/50"
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      value={type}
+                      className="h-4 w-4 shrink-0 accent-[#CF2030]"
+                      {...form.register("membershipType", {
+                        onChange: (e) =>
+                          handleMembershipTypeChange(
+                            e.target
+                              .value as RegistrationFormValues["membershipType"]
+                          ),
+                      })}
+                    />
+                    <span className="text-sm font-medium text-[#CF2030]">
+                      {MEMBERSHIP_TYPE_LABELS[type]}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </Field>
+
+          {membershipType === "bni_member" ? (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field
+                  label="Region *"
+                  error={form.formState.errors.region?.message}
+                >
+                  <Select {...form.register("region")}>
+                    <option value="" disabled>
+                      Select region
+                    </option>
+                    {REGIONS.map((region) => (
+                      <option key={region} value={region}>
+                        {region}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field
+                  label="Chapter *"
+                  error={form.formState.errors.chapter?.message}
+                >
+                  <Input
+                    placeholder="Enter your chapter name"
+                    {...form.register("chapter")}
+                  />
+                </Field>
+              </div>
+            </>
+          ) : (
+            <>
+              <Field
+                label="District *"
+                error={form.formState.errors.district?.message}
+              >
+                <Input
+                  placeholder="Enter your district"
+                  {...form.register("district")}
+                />
+              </Field>
+              <Field
+                label="Who referred you (optional)"
+                error={form.formState.errors.referredBy?.message}
+              >
+                <Input
+                  placeholder="Name of the person who referred you"
+                  {...form.register("referredBy")}
+                />
+              </Field>
+            </>
+          )}
 
           <Field
             label="Number of members *"

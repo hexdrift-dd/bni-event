@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updatePaymentStatusAction } from "@/app/actions";
 import type { PaymentStatus, Registration } from "@/types";
-import { PAYMENT_STATUSES, PAYMENT_STATUS_LABELS } from "@/lib/constants";
+import { PAYMENT_STATUSES, PAYMENT_STATUS_LABELS, MEMBERSHIP_TYPE_LABELS } from "@/lib/constants";
 import { formatCurrency } from "@/lib/pricing";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -62,8 +62,24 @@ export function RegistrationDetailPanel({
         <Item label="Name" value={registration.name} />
         <Item label="Phone" value={registration.phone} />
         <Item label="Email" value={registration.email} />
-        <Item label="Chapter" value={registration.chapter} />
-        <Item label="Region" value={registration.region} />
+        <Item
+          label="Membership"
+          value={MEMBERSHIP_TYPE_LABELS[registration.membership_type]}
+        />
+        {registration.membership_type === "bni_member" ? (
+          <>
+            <Item label="Chapter" value={registration.chapter} />
+            <Item label="Region" value={registration.region} />
+          </>
+        ) : (
+          <>
+            <Item label="District" value={registration.district || "—"} />
+            <Item
+              label="Referred by"
+              value={registration.referred_by || "—"}
+            />
+          </>
+        )}
         <Item label="Members" value={String(registration.member_count)} />
         <Item label="Amount" value={formatCurrency(registration.amount)} />
         <Item

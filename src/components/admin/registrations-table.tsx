@@ -40,6 +40,8 @@ export function RegistrationsTable({ rows }: { rows: Registration[] }) {
           row.email,
           row.chapter,
           row.region,
+          row.district,
+          row.referred_by,
         ]
           .join(" ")
           .toLowerCase();

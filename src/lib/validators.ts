@@ -1,51 +1,102 @@
 import { z } from "zod";
-import { PAYMENT_CONFIG, PAYMENT_STATUSES, REGIONS } from "./constants";
+import {
+  MEMBERSHIP_TYPES,
+  PAYMENT_CONFIG,
+  PAYMENT_STATUSES,
+  REGIONS,
+} from "./constants";
 
 const phoneRegex = /^[6-9]\d{9}$/;
 
-export const registrationFormSchema = z.object({
-  phone: z
-    .string()
-    .trim()
-    .transform((v) => v.replace(/\s+/g, ""))
-    .pipe(
-      z
-        .string()
-        .regex(phoneRegex, "Enter a valid 10-digit Indian mobile number")
-    ),
-  name: z
-    .string()
-    .trim()
-    .min(2, "Name must be at least 2 characters")
-    .max(120, "Name is too long"),
-  email: z.string().trim().email("Enter a valid email address").toLowerCase(),
-  region: z
-    .string()
-    .trim()
-    .refine(
-      (v) => (REGIONS as readonly string[]).includes(v),
-      "Please select a valid region"
-    ),
-  chapter: z
-    .string()
-    .trim()
-    .min(2, "Chapter is required")
-    .max(120, "Chapter name is too long"),
-  memberCount: z
-    .number({ error: "Member count is required" })
-    .int("Member count must be a whole number")
-    .min(1, "At least 1 member is required")
-    .max(50, "Maximum 50 members allowed"),
-  consentAccepted: z.boolean().refine((val) => val === true, {
-    message: "You must confirm the registration details",
-  }),
-  notes: z
-    .string()
-    .trim()
-    .max(1000, "Notes must be under 1000 characters")
-    .optional()
-    .or(z.literal("")),
-});
+export const registrationFormSchema = z
+  .object({
+    phone: z
+      .string()
+      .trim()
+      .transform((v) => v.replace(/\s+/g, ""))
+      .pipe(
+        z
+          .string()
+          .regex(phoneRegex, "Enter a valid 10-digit Indian mobile number")
+      ),
+    name: z
+      .string()
+      .trim()
+      .min(2, "Name must be at least 2 characters")
+      .max(120, "Name is too long"),
+    email: z.string().trim().email("Enter a valid email address").toLowerCase(),
+    membershipType: z.enum(MEMBERSHIP_TYPES, {
+      error: "Please select a membership type",
+    }),
+    region: z.string().trim().optional().or(z.literal("")),
+    chapter: z.string().trim().optional().or(z.literal("")),
+    district: z.string().trim().optional().or(z.literal("")),
+    referredBy: z.string().trim().optional().or(z.literal("")),
+    memberCount: z
+      .number({ error: "Member count is required" })
+      .int("Member count must be a whole number")
+      .min(1, "At least 1 member is required")
+      .max(50, "Maximum 50 members allowed"),
+    consentAccepted: z.boolean().refine((val) => val === true, {
+      message: "You must confirm the registration details",
+    }),
+    notes: z
+      .string()
+      .trim()
+      .max(1000, "Notes must be under 1000 characters")
+      .optional()
+      .or(z.literal("")),
+  })
+  .superRefine((data, ctx) => {
+    if (data.membershipType === "bni_member") {
+      if (
+        !data.region ||
+        !(REGIONS as readonly string[]).includes(data.region)
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Please select a valid region",
+          path: ["region"],
+        });
+      }
+      if (!data.chapter || data.chapter.length < 2) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Chapter is required",
+          path: ["chapter"],
+        });
+      } else if (data.chapter.length > 120) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Chapter name is too long",
+          path: ["chapter"],
+        });
+      }
+      return;
+    }
+
+    if (!data.district || data.district.length < 2) {
+      ctx.addIssue({
+        code: "custom",
+        message: "District is required",
+        path: ["district"],
+      });
+    } else if (data.district.length > 120) {
+      ctx.addIssue({
+        code: "custom",
+        message: "District name is too long",
+        path: ["district"],
+      });
+    }
+
+    if (data.referredBy && data.referredBy.length > 120) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Referrer name is too long",
+        path: ["referredBy"],
+      });
+    }
+  });
 
 export type RegistrationFormValues = z.infer<typeof registrationFormSchema>;
 
