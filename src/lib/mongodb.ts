@@ -65,8 +65,11 @@ export interface RegistrationDoc {
   name: string;
   phone: string;
   email: string;
+  membership_type: string;
   region: string;
   chapter: string;
+  district: string | null;
+  referred_by: string | null;
   category: string;
   member_count: number;
   amount: number;

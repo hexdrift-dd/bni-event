@@ -12,7 +12,7 @@ import { formatRegistrationId } from "@/lib/registration-id";
 import { calculateContribution } from "@/lib/pricing";
 import type { RegistrationFormValues } from "@/lib/validators";
 import type { Registration, RegistrationFilters } from "@/types";
-import { PAYMENT_CONFIG } from "@/lib/constants";
+import { PAYMENT_CONFIG, EVENT_CONFIG } from "@/lib/constants";
 import {
   createUpiPaymentLink,
   fetchPaymentLink,
@@ -34,14 +34,20 @@ async function ready() {
 }
 
 function toRegistration(doc: WithId<RegistrationDoc>): Registration {
+  const membershipType =
+    doc.membership_type === "non_bni_member" ? "non_bni_member" : "bni_member";
+
   return {
     id: doc._id.toString(),
     registration_id: doc.registration_id,
     name: doc.name,
     phone: doc.phone,
     email: doc.email,
+    membership_type: membershipType,
     region: doc.region,
     chapter: doc.chapter,
+    district: doc.district ?? null,
+    referred_by: doc.referred_by ?? null,
     category: doc.category,
     member_count: doc.member_count,
     amount: doc.amount,
@@ -99,14 +105,19 @@ export async function createRegistration(
   const registrationId = formatRegistrationId(sequence);
   const now = new Date();
 
+  const isBniMember = data.membershipType === "bni_member";
+
   const doc: RegistrationDoc = {
     registration_id: registrationId,
     name: data.name,
     phone: data.phone,
     email: data.email,
-    region: data.region || "Calicut",
-    chapter: data.chapter,
-    category: "",
+    membership_type: data.membershipType,
+    region: isBniMember ? data.region || EVENT_CONFIG.region : "",
+    chapter: isBniMember ? data.chapter || "" : "",
+    district: isBniMember ? null : data.district || null,
+    referred_by: isBniMember ? null : data.referredBy?.trim() || null,
+    category: isBniMember ? "BNI Member" : "Non BNI Member",
     member_count: data.memberCount,
     amount,
     consent_accepted: true,
@@ -130,7 +141,11 @@ export async function createRegistration(
     registrationId,
     action: "registered",
     actor: "public",
-    details: { amount, member_count: data.memberCount },
+    details: {
+      amount,
+      member_count: data.memberCount,
+      membership_type: data.membershipType,
+    },
   });
 
   const registration = await ensurePaymentLink(
@@ -467,6 +482,8 @@ export async function listRegistrations(
       { phone: { $regex: q, $options: "i" } },
       { email: { $regex: q, $options: "i" } },
       { chapter: { $regex: q, $options: "i" } },
+      { district: { $regex: q, $options: "i" } },
+      { referred_by: { $regex: q, $options: "i" } },
     ];
   }
 

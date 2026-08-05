@@ -26,6 +26,15 @@ export const REGIONS = [
   "Wayanad",
 ] as const;
 
+export const MEMBERSHIP_TYPES = ["bni_member", "non_bni_member"] as const;
+
+export type MembershipType = (typeof MEMBERSHIP_TYPES)[number];
+
+export const MEMBERSHIP_TYPE_LABELS: Record<MembershipType, string> = {
+  bni_member: "BNI Member",
+  non_bni_member: "Non BNI Member",
+};
+
 export const PRICING_RULES = {
   perPerson: 1000,
   currency: "INR" as const,

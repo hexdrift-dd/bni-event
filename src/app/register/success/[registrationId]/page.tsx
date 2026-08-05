@@ -8,6 +8,7 @@ import {
 import {
   CONTACTS,
   EVENT_CONFIG,
+  MEMBERSHIP_TYPE_LABELS,
   PAYMENT_CONFIG,
   PAYMENT_STATUS_LABELS,
 } from "@/lib/constants";
@@ -113,8 +114,26 @@ export default async function RegistrationSuccessPage({
               <Row label="Name" value={registration.name} />
               <Row label="Phone" value={registration.phone} />
               <Row label="Email" value={registration.email} />
-              <Row label="Region" value={registration.region} />
-              <Row label="Chapter" value={registration.chapter} />
+              <Row
+                label="Membership"
+                value={MEMBERSHIP_TYPE_LABELS[registration.membership_type]}
+              />
+              {registration.membership_type === "bni_member" ? (
+                <>
+                  <Row label="Region" value={registration.region} />
+                  <Row label="Chapter" value={registration.chapter} />
+                </>
+              ) : (
+                <>
+                  <Row label="District" value={registration.district || "—"} />
+                  {registration.referred_by ? (
+                    <Row
+                      label="Referred by"
+                      value={registration.referred_by}
+                    />
+                  ) : null}
+                </>
+              )}
               <Row label="Members" value={String(registration.member_count)} />
               <Row
                 label="Pricing"
